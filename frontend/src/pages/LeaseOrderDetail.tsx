@@ -155,8 +155,10 @@ export default function LeaseOrderDetail() {
     mtForm.resetFields()
     if (record) {
       mtForm.setFieldsValue({
-        startTime: record.startTime ? dayjs(record.startTime) : null,
-        endTime: record.endTime ? dayjs(record.endTime) : null,
+        timeRange: [
+          record.startTime ? dayjs(record.startTime) : null,
+          record.endTime ? dayjs(record.endTime) : null,
+        ],
         description: record.description,
         maintenanceCost: record.maintenanceCost,
         status: record.status,
@@ -168,25 +170,39 @@ export default function LeaseOrderDetail() {
 
   const submitMt = async (values: any) => {
     try {
-      const payload = {
-        startTime: values.startTime.toISOString(),
-        endTime: values.endTime.toISOString(),
+      const [startDay, endDay] = values.timeRange || []
+      if (!startDay || !endDay) {
+        message.error('Please select start and end time')
+        return
+      }
+      if (endDay.isBefore(startDay)) {
+        message.error('End time before start')
+        return
+      }
+      const payload: any = {
+        startTime: startDay.format('YYYY-MM-DDTHH:mm:ss'),
+        endTime: endDay.format('YYYY-MM-DDTHH:mm:ss'),
         description: values.description,
-        maintenanceCost: values.maintenanceCost || 0,
-        status: values.status,
+        maintenanceCost: values.maintenanceCost ?? 0,
+        status: values.status ?? 'COMPLETED',
       }
+      let res: any
       if (mtModal.editing) {
-        await maintenanceApi.update(orderId, mtModal.editing.id!, payload)
+        res = await maintenanceApi.update(orderId, mtModal.editing.id!, payload)
       } else {
-        await maintenanceApi.create(orderId, payload)
+        res = await maintenanceApi.create(orderId, payload)
       }
-      message.success('维修登记成功，运行小时已自动重算')
+      const dtHours = res?.data?.downtimeHours
+      const sfx = dtHours != null ? (", Downtime " + Number(dtHours).toFixed(2) + "h deducted") : ", deduction recalculated"
+      const pref = mtModal.editing ? "Updated" : "Registered"
+      message.success(pref + " maintenance OK" + sfx)
       setMtModal({ open: false })
       loadAll()
     } catch (e: any) {
-      message.error(e.message)
+      message.error(e.message || 'Save failed')
     }
   }
+
 
   const removeMt = async (m: MaintenanceRecord) => {
     try {
@@ -717,15 +733,17 @@ export default function LeaseOrderDetail() {
       >
         <Form form={mtForm} layout="vertical" onFinish={submitMt}>
           <Form.Item
-            label="维修时段"
-            name={['startTime', 'endTime']}
-            rules={[{ required: true, message: '必填' }]}
+            label="维修时段（开始时间 ～ 结束时间）"
+            name="timeRange"
+            rules={[{ required: true, message: '请选择维修开始和结束时间' }]}
           >
             <RangePicker
-              showTime
+              showTime={{ format: 'HH:mm' }}
               format="YYYY-MM-DD HH:mm"
               style={{ width: '100%' }}
+              placeholder={['维修开始时间', '维修结束时间']}
             />
+
           </Form.Item>
           <Form.Item label="维修描述" name="description">
             <Input.TextArea rows={3} placeholder="如 减速器更换、故障描述" />
