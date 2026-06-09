@@ -1,5 +1,14 @@
 import axios from 'axios'
-import type { Robot, LeaseOrder, RunningHour, MaintenanceRecord, Settlement, ApiResponse } from '@/types'
+import type {
+  Robot,
+  LeaseOrder,
+  RunningHour,
+  MaintenanceRecord,
+  Settlement,
+  ApiResponse,
+  BatchImportResult,
+  TimelineEvent,
+} from '@/types'
 
 const request = axios.create({
   baseURL: '/api',
@@ -51,6 +60,17 @@ export const leaseOrderApi = {
     request.post(`/lease-orders/${id}/activate`),
   complete: (id: number): Promise<ApiResponse<LeaseOrder>> =>
     request.post(`/lease-orders/${id}/complete`),
+  downloadTemplate: (): Promise<Blob> =>
+    request.get('/lease-orders/import/template', { responseType: 'blob' }),
+  batchImport: (file: File): Promise<ApiResponse<BatchImportResult>> => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request.post('/lease-orders/import', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  timeline: (id: number): Promise<ApiResponse<TimelineEvent[]>> =>
+    request.get(`/lease-orders/${id}/timeline`),
 }
 
 export const runningHourApi = {

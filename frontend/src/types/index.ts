@@ -168,3 +168,30 @@ export interface ApiResponse<T> {
   message: string
   data: T
 }
+
+export interface BatchImportResult {
+  totalCount: number
+  successCount: number
+  failCount: number
+  successOrderNos: string[]
+  errors: ImportError[]
+}
+
+export interface ImportError {
+  rowNum: number
+  field: string
+  message: string
+  originalValue: string
+}
+
+export interface TimelineEvent {
+  id: number
+  type: string
+  typeName: string
+  title: string
+  description: string
+  eventTime: string
+  createdAt: string
+  color: string
+  extra?: any
+}

@@ -23,6 +23,9 @@ import {
   Divider,
   Result,
   Popconfirm,
+  Timeline,
+  Typography,
+  Empty,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -48,6 +51,7 @@ import type {
   MaintenanceRecord,
   Settlement,
   SettlementStatus,
+  TimelineEvent,
 } from '@/types'
 import {
   MaintenanceStatusText,
@@ -70,6 +74,7 @@ export default function LeaseOrderDetail() {
   const [runningHours, setRunningHours] = useState<RunningHour[]>([])
   const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>([])
   const [settlement, setSettlement] = useState<Settlement | null>(null)
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([])
 
   const [rhModal, setRhModal] = useState<{ open: boolean; editing?: RunningHour }>({ open: false })
   const [mtModal, setMtModal] = useState<{ open: boolean; editing?: MaintenanceRecord }>({ open: false })
@@ -81,7 +86,7 @@ export default function LeaseOrderDetail() {
   const loadAll = async () => {
     try {
       setLoading(true)
-      const [oRes, rhRes, mtRes, sRes] = await Promise.all([
+      const [oRes, rhRes, mtRes, sRes, tRes] = await Promise.all([
         leaseOrderApi.get(orderId),
         runningHourApi.list(orderId),
         maintenanceApi.list(orderId),
@@ -92,11 +97,19 @@ export default function LeaseOrderDetail() {
             return { data: null } as any
           }
         })(),
+        (async () => {
+          try {
+            return await leaseOrderApi.timeline(orderId)
+          } catch {
+            return { data: [] } as any
+          }
+        })(),
       ])
       setOrder((oRes as any).data)
       setRunningHours((rhRes as any).data || [])
       setMaintenance((mtRes as any).data || [])
       setSettlement((sRes as any).data)
+      setTimeline((tRes as any).data || [])
     } catch (e: any) {
       message.error(e.message)
     } finally {
@@ -689,6 +702,92 @@ export default function LeaseOrderDetail() {
                   )}
                 </Card>
               </div>
+            ),
+          },
+          {
+            key: '4',
+            label: '时间线',
+            children: (
+              <Card
+                title="全生命周期时间线"
+                extra={
+                  <Tag color="blue">
+                    按事件时间排序 · 共 {timeline.length} 条记录
+                  </Tag>
+                }
+              >
+                {timeline.length === 0 ? (
+                  <Empty description="暂无时间线数据" />
+                ) : (
+                  <div style={{ padding: '12px 4px' }}>
+                    <Timeline
+                      mode="left"
+                      items={timeline.map((evt) => {
+                        const timeText = evt.eventTime
+                          ? dayjs(evt.eventTime).format('YYYY-MM-DD HH:mm')
+                          : evt.createdAt
+                            ? dayjs(evt.createdAt).format('YYYY-MM-DD HH:mm')
+                            : ''
+                        return {
+                          color: evt.color || 'blue',
+                          label: (
+                            <div style={{ minWidth: 130 }}>
+                              <Typography.Text
+                                strong
+                                style={{
+                                  fontSize: 13,
+                                  color: '#262626',
+                                  display: 'block',
+                                }}
+                              >
+                                {evt.typeName}
+                              </Typography.Text>
+                              <Typography.Text
+                                type="secondary"
+                                style={{ fontSize: 12 }}
+                              >
+                                {timeText}
+                              </Typography.Text>
+                            </div>
+                          ),
+                          children: (
+                            <div
+                              style={{
+                                padding: '8px 12px',
+                                background: '#fafafa',
+                                borderRadius: 6,
+                                borderLeft: `3px solid ${evt.color || '#1677ff'}`,
+                                marginBottom: 8,
+                              }}
+                            >
+                              <Typography.Title
+                                level={5}
+                                style={{
+                                  margin: 0,
+                                  marginBottom: 4,
+                                  fontSize: 14,
+                                }}
+                              >
+                                {evt.title}
+                              </Typography.Title>
+                              <Typography.Paragraph
+                                type="secondary"
+                                style={{
+                                  margin: 0,
+                                  fontSize: 13,
+                                  whiteSpace: 'pre-wrap',
+                                }}
+                              >
+                                {evt.description}
+                              </Typography.Paragraph>
+                            </div>
+                          ),
+                        }
+                      })}
+                    />
+                  </div>
+                )}
+              </Card>
             ),
           },
         ]}
